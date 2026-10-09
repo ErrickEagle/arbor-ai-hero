@@ -117,9 +117,9 @@
   .shape-ui { position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; bottom: 40px; z-index: 5; display: flex; padding: 0 8px; background: rgba(20,22,28,.5); border: 1px solid var(--line); border-radius: 999px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
   .dots { display: flex; gap: 0; }
   .dots button { width: 30px; height: 38px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
-  .dots button::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.3); transition: background .3s, width .3s; }
+  .dots button::before { content: ""; width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.3); transition: background .3s, transform .3s; }
   .dots button:hover::before { background: rgba(255,255,255,.7); }
-  .dots button.on::before { width: 18px; border-radius: 3px; background: #fff; }
+  .dots button.on::before { transform: scaleX(3); background: #fff; } /* stretch with transform, not width */
 
   /* reveal */
   .hero.loading .rv { animation-play-state: paused; }
