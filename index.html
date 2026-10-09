@@ -859,6 +859,8 @@ const focusPt = new THREE.Vector3(0, 0.1, 0);
 let running = true;
 document.addEventListener("visibilitychange", () => { running = !document.hidden; if (running) { clock.getDelta(); tick(); } });
 let nextAmbient = 1.5, turn = 0, spinMix = REDUCED ? 1 : 0;
+const AUTO_HOLD = 3;   // seconds each finished shape stays before the next one
+let holdStart = -1;
 
 function tick() {
   if (!running) return;
@@ -866,6 +868,13 @@ function tick() {
   const t = (uniforms.uTime.value += dt * (REDUCED ? 0.35 : 1));
 
   uniforms.uMorph.value = THREE.MathUtils.clamp((t - morphStart) / morphDur, 0, 1);
+
+  // auto-advance: once a shape has fully formed, hold it, then move to the next
+  if (introDone && !REDUCED) {
+    if (uniforms.uMorph.value < 1) holdStart = -1;
+    else if (holdStart < 0) holdStart = t;
+    else if (t - holdStart >= AUTO_HOLD) { holdStart = -1; goTo((current + 1) % SHAPES.length); }
+  }
   if (!introDone) {
     if (uniforms.uMorph.value >= 1 && t > morphStart + morphDur + 0.15) {
       // sphere assembled: reveal the page and grow the first shape
