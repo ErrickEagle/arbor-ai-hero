@@ -483,33 +483,6 @@ const geo = new THREE.BufferGeometry();
 // intro: dots fly in from both sides and gather into a sphere, which then becomes the first shape
 const SPHERE = makeSphere();
 
-// the slogan, spelled out by the particles between the loading sphere and the first shape
-const SLOGAN_TEXT = "Intelligence that takes shape";
-function makeSlogan(portrait) {
-  const lines = portrait ? ["INTELLIGENCE", "THAT TAKES", "SHAPE"] : ["INTELLIGENCE", "THAT TAKES SHAPE"];
-  const W = 1400, H = portrait ? 620 : 420, cv = document.createElement("canvas"), o = cv.getContext("2d");
-  cv.width = W; cv.height = H;
-  let size = H / (lines.length * 1.18);
-  o.font = `400 ${size}px Jost, sans-serif`;
-  const widest = Math.max(...lines.map(l => o.measureText(l).width));
-  if (widest > W * 0.96) size *= W * 0.96 / widest;
-  o.font = `400 ${size}px Jost, sans-serif`;
-  o.textAlign = "center"; o.textBaseline = "middle"; o.fillStyle = o.strokeStyle = "#fff";
-  o.lineWidth = size * 0.06; o.lineJoin = "round";
-  lines.forEach((l, i) => { const y = H / 2 + (i - (lines.length - 1) / 2) * size * 1.12; o.fillText(l, W / 2, y); o.strokeText(l, W / 2, y); });
-  const img = o.getImageData(0, 0, W, H).data, hits = [];
-  for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) if (img[(y * W + x) * 4 + 3] > 128) hits.push(x, y);
-  // world size: fill most of the visible width (narrower on phones)
-  const worldW = portrait ? 3.9 : 4.9, k = worldW / W, cy = portrait ? 0.35 : 0.45;
-  const p = new Float32Array(N * 3), n = hits.length / 2;
-  for (let i = 0; i < N; i++) {
-    const j = (rnd() * n) | 0;
-    p[i * 3] = (hits[j * 2] - W / 2 + rnd() * 2) * k;
-    p[i * 3 + 1] = cy - (hits[j * 2 + 1] - H / 2 + rnd() * 2) * k;
-    p[i * 3 + 2] = gauss() * 0.06;
-  }
-  return p;
-}
 function makeOffscreen() {
   const p = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) {
@@ -751,7 +724,7 @@ document.querySelectorAll(".btn-line").forEach(attachDots);
 
 /* ---------------- shape switching ---------------- */
 let current = 0, morphStart = REDUCED ? -10 : 0.1, morphDur = REDUCED ? 0.01 : 2.2;
-let introDone = REDUCED, introStage = REDUCED ? 2 : 0;
+let introDone = REDUCED;
 if (REDUCED) hero.classList.remove("loading");
 const dotsEl = document.getElementById("dots"), tagsEl = document.getElementById("tags");
 dotsEl.innerHTML = SHAPES.map((sh, i) => `<button type="button" role="tab" aria-label="${sh.label}" data-i="${i}"></button>`).join("");
@@ -892,23 +865,16 @@ function tick() {
 
   uniforms.uMorph.value = THREE.MathUtils.clamp((t - morphStart) / morphDur, 0, 1);
   if (!introDone) {
-    if (introStage === 0 && uniforms.uMorph.value >= 1 && t > morphStart + morphDur + 0.15) {
-      // sphere assembled: the dots spell out the slogan
-      introStage = 1;
+    if (uniforms.uMorph.value >= 1 && t > morphStart + morphDur + 0.15) {
+      // sphere assembled: reveal the page and grow the first shape
+      introDone = true;
       hero.classList.remove("loading");
-      fromAttr.array.set(SPHERE); toAttr.array.set(makeSlogan(narrow));
+      setTimeout(showFirstWords, 700);
+      fromAttr.array.set(SPHERE); toAttr.array.set(SHAPES[0].data);
       fromAttr.needsUpdate = toAttr.needsUpdate = true;
       uniforms.uStagger.value = 0.41; uniforms.uSwirl.value = 0.7;
       uniforms.uMorph.value = 0;
-      morphStart = t + 0.1; morphDur = 1.8;
-    } else if (introStage === 1 && t > morphStart + morphDur + 2.0) {
-      // slogan held: grow the first shape and open the page
-      introStage = 2; introDone = true;
-      setTimeout(showFirstWords, 700);
-      fromAttr.array.set(toAttr.array); toAttr.array.set(SHAPES[0].data);
-      fromAttr.needsUpdate = toAttr.needsUpdate = true;
-      uniforms.uMorph.value = 0;
-      morphStart = t + 0.05; morphDur = 2.6;
+      morphStart = t + 0.2; morphDur = 2.6;
     }
   }
 
