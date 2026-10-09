@@ -23,7 +23,7 @@
   a, button { color: inherit; text-decoration: none; font: inherit; }
 
   .hero {
-    position: relative; height: 100svh; min-height: 640px; overflow: hidden; isolation: isolate;
+    position: relative; height: 100vh; height: 100svh; min-height: 640px; overflow: hidden; isolation: isolate;
     background:
       radial-gradient(70% 60% at 50% 42%, #5d636f 0%, #444955 38%, #2d3139 72%, #1f2228 100%);
   }
@@ -221,23 +221,35 @@
   <div class="cursor-dot" id="cursorDot"></div>
 </section>
 
-<script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+<script>
+  // safety net: if the 3D scene can't start on this device (old browser, no WebGL), still reveal the page
+  setTimeout(function () {
+    var h = document.getElementById("hero");
+    if (window.__heroStarted || !h || !h.classList.contains("loading")) return;
+    h.classList.remove("loading");
+    var l = document.getElementById("wordL"), r = document.getElementById("wordR");
+    if (l && !l.textContent) l.textContent = "Learn";
+    if (r && !r.textContent) r.textContent = "Grow";
+  }, 7000);
 </script>
 <script type="module">
-import * as THREE from "three";
+// full URL instead of an import map, so older Safari / Android browsers can load it
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const hero = document.getElementById("hero");
 const canvas = document.getElementById("gl");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, premultipliedAlpha: true, powerPreference: "high-performance" });
 renderer.setClearColor(0x000000, 0);
+window.__heroStarted = true; // WebGL is up; the intro will reveal the page itself
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
 const WATER = -1.7;
 // pure additive (ONE, ONE): shader outputs premultiplied light, so dots brighten the grey page
 const ADD = { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneFactor };
-const N = 56000;
+// phones and low-power devices get fewer (slightly larger) dots so they stay smooth
+const LOW_POWER = matchMedia("(max-width: 860px), (pointer: coarse)").matches || (navigator.hardwareConcurrency || 8) <= 4;
+const N = LOW_POWER ? 30000 : 56000;
 
 /* ---------------- helpers ---------------- */
 const rnd = Math.random;
@@ -510,12 +522,13 @@ const uniforms = {
   uRadius: { value: 0.17 },
   uWater: { value: WATER },
   uFocus: { value: 6.6 },
+  uSizeK: { value: LOW_POWER ? 1.3 : 1 },
   uStagger: { value: REDUCED ? 0.41 : 0.7 },
   uSwirl: { value: REDUCED ? 0.7 : 0.45 },
 };
 
 const treeVert = /* glsl */`
-  uniform float uTime, uMorph, uScale, uMouseStrength, uRadius, uWater, uMirror, uFocus, uStagger, uSwirl;
+  uniform float uTime, uMorph, uScale, uMouseStrength, uRadius, uWater, uMirror, uFocus, uStagger, uSwirl, uSizeK;
   uniform vec3 uMouse;
   attribute vec3 aFrom; attribute vec4 aRand;
   varying vec3 vColor; varying float vAlpha;
@@ -566,7 +579,7 @@ const treeVert = /* glsl */`
 
     // silver glitter with a lavender cast; a few big sparkles
     float sparkle = step(0.965, aRand.x);
-    float size = 0.0135 * (0.5 + aRand.x * aRand.x * 1.6) * (1.0 + sparkle * 1.8) * (1.0 + f * 0.6);
+    float size = 0.0135 * uSizeK * (0.5 + aRand.x * aRand.x * 1.6) * (1.0 + sparkle * 1.8) * (1.0 + f * 0.6);
     size *= (1.0 + nearness * 0.25) * (1.0 + blur * 0.7);
     gl_PointSize = max(size * uScale / -mv.z, 1.0);
     vec3 silver = vec3(0.86, 0.88, 0.95), lav = vec3(0.74, 0.62, 1.0);
@@ -838,7 +851,7 @@ document.querySelectorAll(".hero a, .hero button").forEach(el => {
 let narrow = false;
 function resize() {
   const w = hero.clientWidth, h = hero.clientHeight;
-  const dpr = Math.min(devicePixelRatio, 2);
+  const dpr = Math.min(devicePixelRatio, LOW_POWER ? 1.5 : 2);
   renderer.setPixelRatio(dpr);
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
@@ -864,7 +877,7 @@ let holdStart = -1;
 
 function tick() {
   if (!running) return;
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const dt = Math.min(clock.getDelta(), 0.1); // keeps real-time speed down to ~10fps on slow phones
   const t = (uniforms.uTime.value += dt * (REDUCED ? 0.35 : 1));
 
   uniforms.uMorph.value = THREE.MathUtils.clamp((t - morphStart) / morphDur, 0, 1);
